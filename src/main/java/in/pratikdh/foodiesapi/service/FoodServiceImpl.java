@@ -1,6 +1,11 @@
 package in.pratikdh.foodiesapi.service;
 
 
+import in.pratikdh.foodiesapi.entity.FoodEntity;
+import in.pratikdh.foodiesapi.io.FoodRequest;
+import in.pratikdh.foodiesapi.io.FoodResponse;
+import in.pratikdh.foodiesapi.repository.FoodRepository;
+import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,6 +20,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 @Service
+@AllArgsConstructor
 public class FoodServiceImpl implements FoodService {
 
     // Injecting the AWS S3 client
@@ -23,6 +29,8 @@ public class FoodServiceImpl implements FoodService {
     public FoodServiceImpl(S3Client s3Client) {
         this.s3Client = s3Client;
     }
+
+    private final FoodRepository foodRepository;
 
 
     // Reading the S3 bucket name from application.properties
@@ -77,4 +85,22 @@ public class FoodServiceImpl implements FoodService {
             );
         }
     }
+
+    @Override
+    public FoodResponse addFood(FoodRequest request, MultipartFile file) {
+FoodEntity newFoodEntity = convertToEntity(request);
+String imageurl = uploadFile(file);
+newFoodEntity.setImageUrl(imageurl);
+foodRepository.save(newFoodEntity);
+    }
+
+    private FoodEntity convertToEntity(FoodRequest request) {
+        return FoodEntity.builder()
+                .name(request.getName())
+                .description(request.getDescription())
+                .category(request.getCategory())
+                .price(request.getPrice())
+                .build();
+    }
+
 }
