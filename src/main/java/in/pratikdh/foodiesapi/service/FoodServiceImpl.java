@@ -1,6 +1,5 @@
 package in.pratikdh.foodiesapi.service;
 
-
 import in.pratikdh.foodiesapi.entity.FoodEntity;
 import in.pratikdh.foodiesapi.io.FoodRequest;
 import in.pratikdh.foodiesapi.io.FoodResponse;
@@ -23,62 +22,69 @@ import java.util.UUID;
 @AllArgsConstructor
 public class FoodServiceImpl implements FoodService {
 
-    // Injecting the AWS S3 client
+    // AWS S3 client used for interacting with the S3 bucket
     private final S3Client s3Client;
 
+    // Repository to interact with the database
+    private final FoodRepository foodRepository;
+
+    // Fetching the S3 bucket name from application.properties
+    @Value("${aws.s3.bucketName}")
+    private String bucketName;
+
+    // Constructor injection (Redundant due to @AllArgsConstructor, but provided explicitly)
     public FoodServiceImpl(S3Client s3Client) {
         this.s3Client = s3Client;
     }
 
-    private final FoodRepository foodRepository;
-
-
-    // Reading the S3 bucket name from application.properties
-    @Value("${aws.s3.bucketName}")
-    private String bucketName;
-
+    /**
+     * Uploads a file to AWS S3 and returns the file URL
+     * @param file The multipart file to upload
+     * @return The public URL of the uploaded file
+     */
     @Override
     public String uploadFile(MultipartFile file) {
         // Extract the original filename
         String originalFilename = file.getOriginalFilename();
 
-        // Validate file name
+        // Validate the file name to ensure it has an extension
         if (originalFilename == null || !originalFilename.contains(".")) {
             throw new IllegalArgumentException("Invalid file name");
         }
 
-        // Extract the file extension from the original filename
+        // Extract the file extension (e.g., jpg, png)
         String fileExtension = originalFilename.substring(originalFilename.lastIndexOf('.') + 1);
 
-        // Generate a unique key for the file (UUID + extension)
+        // Generate a unique key for the file using UUID
         String key = UUID.randomUUID().toString() + "." + fileExtension;
 
         try {
-            // Build the PutObjectRequest with bucket, key, and content type
+            // Create a PutObjectRequest with bucket name, key, and content type
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(key)
                     .contentType(file.getContentType())
                     .build();
 
-            // Upload the file to S3
+            // Upload the file to S3 with the request and file bytes
             PutObjectResponse response = s3Client.putObject(
                     putObjectRequest,
-                    RequestBody.fromBytes(file.getBytes()) // Read file content as bytes
+                    RequestBody.fromBytes(file.getBytes())
             );
 
-            // If the upload is successful, return the S3 file URL
+            // Check if the upload was successful
             if (response.sdkHttpResponse().isSuccessful()) {
+                // Return the public URL of the uploaded file
                 return "https://" + bucketName + ".s3.amazonaws.com/" + key;
             } else {
-                // If upload fails, throw 500 error
+                // Throw error if upload failed
                 throw new ResponseStatusException(
                         HttpStatus.INTERNAL_SERVER_ERROR, "File upload failed"
                 );
             }
 
         } catch (IOException ex) {
-            // Handle IOException (e.g., if reading file bytes fails)
+            // Handle error if reading file bytes fails
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "An error occurred while uploading the file"
@@ -86,14 +92,33 @@ public class FoodServiceImpl implements FoodService {
         }
     }
 
+    /**
+     * Adds a new food item to the database with an image
+     * @param request The food data (name, description, category, price)
+     * @param file The image file to upload
+     * @return The created food item (not implemented in current code)
+     */
     @Override
     public FoodResponse addFood(FoodRequest request, MultipartFile file) {
-FoodEntity newFoodEntity = convertToEntity(request);
-String imageurl = uploadFile(file);
-newFoodEntity.setImageUrl(imageurl);
-foodRepository.save(newFoodEntity);
+        // Convert incoming request to an entity
+        FoodEntity newFoodEntity = convertToEntity(request);
+
+        // Upload the image and set its URL in the entity
+        String imageurl = uploadFile(file);
+        newFoodEntity.setImageUrl(imageurl);
+
+        // Save the food item to the database
+        foodRepository.save(newFoodEntity);
+
+        // ❌ Missing return statement – should return a FoodResponse object
+        return null; // You should implement and return FoodResponse here
     }
 
+    /**
+     * Converts a FoodRequest DTO to a FoodEntity for persistence
+     * @param request The input food request
+     * @return A FoodEntity ready for database insertion
+     */
     private FoodEntity convertToEntity(FoodRequest request) {
         return FoodEntity.builder()
                 .name(request.getName())
@@ -102,5 +127,4 @@ foodRepository.save(newFoodEntity);
                 .price(request.getPrice())
                 .build();
     }
-
 }
