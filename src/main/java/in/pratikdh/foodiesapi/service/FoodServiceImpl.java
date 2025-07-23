@@ -86,8 +86,8 @@ public class FoodServiceImpl implements FoodService {
         } catch (IOException ex) {
             // Handle error if reading file bytes fails
             throw new ResponseStatusException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "An error occurred while uploading the file"
+                   HttpStatus.INTERNAL_SERVER_ERROR,
+                "Error encountered while uploading Multipart file"
             );
         }
     }
